@@ -1,16 +1,28 @@
 const net = require("net");
+const WebSocket = require("ws");
 
-// Lista de balanças com IPs e portas diferentes
+const PORTA_WS = 8080;
+
+// Servidor WebSocket
+const wss = new WebSocket.Server({ port: PORTA_WS }, () => {
+  console.log(`WebSocket Server rodando na porta ${PORTA_WS}`);
+});
+
+// Função para enviar mensagem para todos os clientes conectados
+function broadcast(dado) {
+  const json = JSON.stringify(dado);
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(json);
+    }
+  });
+}
+
+// Conexão com as balanças
 const balancas = [
   { id: "01", ip: "192.168.0.72", porta: 23 },
   { id: "02", ip: "192.168.0.127", porta: 6432 },
 ];
-
-// Armazenamento temporário em memória (último peso recebido por balança)
-const estadoAtual = {
-  "01": null,
-  "02": null,
-};
 
 balancas.forEach(({ id, ip, porta }) => {
   const socket = new net.Socket();
@@ -21,16 +33,10 @@ balancas.forEach(({ id, ip, porta }) => {
 
   socket.on("data", (data) => {
     const peso = data.toString().trim();
-
-    // Atualiza estado
-    estadoAtual[id] = peso;
-
     console.log(`Balança ${id} | Peso: ${peso}`);
 
-    // Aqui você pode:
-    // - Enviar para o front-end via WebSocket
-    // - Salvar em arquivo JSON
-    // - Registrar no banco de dados
+    // Envia peso via WebSocket
+    broadcast({ balanca: id, peso });
   });
 
   socket.on("close", () => {
